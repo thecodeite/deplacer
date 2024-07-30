@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-import Ably, { RealtimeChannel } from 'ably'
-
+import { IoMdRefreshCircle } from "react-icons/io";
 
 
 const AppWrapper = styled.div`
@@ -35,16 +34,40 @@ const Editor = styled.textarea`
   flex: 1;
 `
 
+const Button = styled.button`
+  padding: 0 0.2em 0.1em;
+  margin: 0.2em;
+  font-size: 1em;
+  border-radius: 0.25em;
+  background-color: #3b3c2e;
+  color: #ccc;
+  border: 1px solid #ccc;
+  cursor: pointer;
+`
+
+const IconButton = styled.button`
+  margin: 0;
+  padding: 4px;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`
+
 function App() {
-  const { name, setName, key, setKey, text, setText, cypherText, setCypherText, peerCount } = useSync();  
+  const { list, reloadList, name, setName, key, setKey, text, setText, cypherText, setCypherText, onGet, onPut, onDel } = useSync();  
 
   return (
     <AppWrapper>
-      <HeadText>Deplacer</HeadText>
       <HeaderBar>
-        <span>
-          Peers: {peerCount}
-        </span>
+        <HeadText>Deplacer</HeadText>
+        <IconButton onClick={() => reloadList()}><IoMdRefreshCircle /></IconButton>
+        {list.map((name, i) => <Button key={i} onClick={() => setName(name)}>{name}</Button>)}
+      </HeaderBar>
+      <HeaderBar>
+        <Button onClick={() => onGet() } >get</Button>
+        <Button onClick={() => onPut() } >put</Button>
+        <Button onClick={() => onDel() } >del</Button>
         <input type="text" placeholder="deplacer name" value={name} onChange={e => setName(e.target.value)} />
         <input type="password" placeholder="deplacer key" value={key} onChange={e => setKey(e.target.value)}
         />
@@ -57,39 +80,59 @@ function App() {
   )
 }
 
-const ably = new Ably.Realtime("ZEuzyg.-vg56A:1Asw56dAORRy2UmcY8J7FC48v8nBla6UrLiox3HTlqI")
-ably.connection.once("connected", () => {
-  console.log("Connected to Ably!")
-})
-
-const browserId = readBrowserId()
-function readBrowserId() {
-  const key = "deplacer-browser-id"
-  let id = localStorage.getItem(key)
-  if (!id) {
-    id = Math.random().toString(36).slice(2)
-    localStorage.setItem(key, id)
-  }
-  return id
-}
 
 
 function useSync() {
-  const [name, setName] = useState('sam')
-  const [key, setKey] = useState('P@55word')
+  const [list, setList] = useState<string[]>([])
+  const [name, setName] = useState('')
+  const [key, setKey] = useState('')
   const [text, setTextSetter] = useState('')
   const [cypherText, setCypherText] = useState('');
-  const [peerCount, setPeerCount] = useState(0)
-  const channelRef = useRef<RealtimeChannel>();
-  const handleRef = useRef(0);
-  const peersRef = useRef<Record<string, number>>({});
-  const peerCheckIntervalRef = useRef(0);
+  const payloadRef = useRef('');
   const textDebounceRef = useRef(0);
-  const channelNameRef = useRef('');
 
-  function countPeers(){
-    return Object.keys(peersRef.current).filter(key => key !== browserId).length;
+  async function onGet() {
+    const r = await fetch(`/api/item?id=${name}`)
+    if (r.ok) {
+      const data = await r.json()
+      console.log('data:', data.encryptedText)
+      const decrypted = await decrypt(toBytes(data.encryptedText), toBytes(data.ivBase64), key);
+      setTextSetter(decrypted)
+    }
+    if (!r.ok) {
+      alert('Error getting');
+    }
   }
+
+  async function onPut() {
+    const r = await fetch(`/api/item?id=${name}`, {
+      method: 'PUT',
+      body: payloadRef.current,
+    })
+    if (!r.ok) {
+      alert('Error putting');
+    }
+  }
+
+  async function onDel() {
+    const r = await fetch(`/api/item?id=${name}`, {
+      method: 'DELETE',
+      body: text,
+    })
+    if (r.ok) {
+      reloadList();
+      setTextSetter('');
+    }
+  }
+
+  async function reloadList() {
+    const r = await fetch('/api/list')
+    if (r.ok) {
+      const data = await r.json()
+      setList(data)
+    }
+  }
+
 
   const setText = (text: string) => {
     setTextSetter(text);
@@ -102,67 +145,18 @@ function useSync() {
 
       setCypherText(encryptedText);
 
-      const message = { browserId, ivBase64, encryptedText }
-      channelRef.current?.publish("text", message);
-      console.log('published:', message)
+      const message = { ivBase64, encryptedText }
+      payloadRef.current = JSON.stringify(message);
+ 
     }, 1000);
   }
-  
-  
+
+
   useEffect(() => {
-    clearTimeout(peerCheckIntervalRef.current);
-    peerCheckIntervalRef.current = window.setInterval(() => {
-      channelRef.current?.publish("hello", { browserId});
-      const now = Date.now();
-      peersRef.current = Object.fromEntries(Object.entries(peersRef.current).filter(([,value]) => now - value < 120000));
-      setPeerCount(countPeers());
-    }, 60000);
-    return () => {
-      clearTimeout(peerCheckIntervalRef.current);
-    }
+    reloadList()
   }, [])
 
-  useEffect(() => {
-    clearTimeout(handleRef.current);
-    handleRef.current = window.setTimeout(async () => {
-      if (!name || name.length === 0) return;
-
-      const newChannelName = `deplacer-${name}`;
-
-      if (newChannelName === channelNameRef.current) return;
-      channelNameRef.current = newChannelName;
-
-      setTextSetter('');
-      channelRef.current = ably.channels.get(channelNameRef.current);
-
-      await channelRef.current.subscribe("hello", (message) => {
-        peersRef.current[message.data.browserId] = Date.now();
-        setPeerCount(countPeers());
-      });
-      await channelRef.current.subscribe("text", (message) => {
-        console.log(message.data);
-        if (message.data.browserId === browserId) return;
-        if (message.data.text){
-          setTextSetter(message.data.text);
-        }else if (message.data.ivBase64 && message.data.encryptedText){
-          setCypherText(message.data.encryptedText);
-          const iv = toBytes(message.data.ivBase64);
-          const encryptedBytes = toBytes(message.data.encryptedText);
-          decrypt(encryptedBytes, iv, key).then(text => setTextSetter(text));
-        } else {
-          setTextSetter('eh?');
-        }
-        
-      });
-
-      console.log(`subscribed to hello and text on ${newChannelName}`);
-
-      await channelRef.current.publish("hello", { browserId});
-    }, 1000);
-   
-  }, [name])
-
-  return { name, setName, key, setKey, text, setText, cypherText, setCypherText, peerCount }
+  return { list, reloadList, name, setName, key, setKey, text, setText, cypherText, setCypherText, onGet, onPut, onDel }
 }
 
 async function deriveKey(password: string) {
@@ -193,11 +187,11 @@ async function deriveKey(password: string) {
 }
 
 function toBase64(bytes: Uint8Array) {
-  return btoa(String.fromCharCode(...bytes));
+  return Buffer.from(bytes).toString('base64');
 }
 
 function toBytes(base64: string) {
-  return new Uint8Array(Array.from(atob(base64), c => c.charCodeAt(0)));
+  return new Uint8Array(Buffer.from(base64, 'base64'));
 }
 
 async function encrypt(message: string, password: string) {

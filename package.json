@@ -10,9 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vercel/kv": "^2.0.0",
+    "@vercel/node": "^3.2.7",
     "ably": "^2.3.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-icons": "^5.2.1",
     "styled-components": "^6.1.12"
   },
   "devDependencies": {
