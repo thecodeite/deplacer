@@ -25,11 +25,6 @@ const HeaderBar = styled.div`
   }
 `
 
-const EditorArea = styled.div`
-  display: flex;
-  flex: 1;
-`
-
 const Editor = styled.textarea`
   flex: 1;
 `
@@ -55,7 +50,7 @@ const IconButton = styled.button`
 `
 
 function App() {
-  const { list, reloadList, name, setName, key, setKey, text, setText, cypherText, setCypherText, onGet, onPut, onDel } = useSync();  
+  const { list, reloadList, name, setName, key, setKey, text, setText, onGet, onPut, onDel } = useSync();  
 
   return (
     <AppWrapper>
@@ -68,14 +63,14 @@ function App() {
         <Button onClick={() => onGet() } >get</Button>
         <Button onClick={() => onPut() } >put</Button>
         <Button onClick={() => onDel() } >del</Button>
-        <input type="text" placeholder="deplacer name" value={name} onChange={e => setName(e.target.value)} />
-        <input type="password" placeholder="deplacer key" value={key} onChange={e => setKey(e.target.value)}
+        <input type="text" placeholder="deplacer key" value={name} onChange={e => setName(e.target.value)} />
+        <input type="text" placeholder="deplacer key" value={key} onChange={e => setKey(e.target.value)}
         />
       </HeaderBar>
-      <EditorArea>
+      {/* <EditorArea> */}
       <Editor value={text} onChange={e => setText(e.target.value)} />
-      <Editor value={cypherText} onChange={e => setCypherText(e.target.value)} />
-      </EditorArea>
+      {/* <Editor value={cypherText} onChange={e => setCypherText(e.target.value)} /> */}
+      {/* </EditorArea> */}
     </AppWrapper>
   )
 }
@@ -87,7 +82,6 @@ function useSync() {
   const [name, setName] = useState('')
   const [key, setKey] = useState('')
   const [text, setTextSetter] = useState('')
-  const [cypherText, setCypherText] = useState('');
   const payloadRef = useRef('');
   const textDebounceRef = useRef(0);
 
@@ -115,13 +109,13 @@ function useSync() {
   }
 
   async function onDel() {
-    const r = await fetch(`/api/item?id=${name}`, {
-      method: 'DELETE',
-      body: text,
+    const r = await fetch(`/api/item?id=${name}&action=delete`, {
+      method: 'POST',
     })
     if (r.ok) {
       reloadList();
       setTextSetter('');
+      setName('');
     }
   }
 
@@ -143,8 +137,6 @@ function useSync() {
       const ivBase64 = toBase64(iv);
       const encryptedText = toBase64(encryptedBytes);
 
-      setCypherText(encryptedText);
-
       const message = { ivBase64, encryptedText }
       payloadRef.current = JSON.stringify(message);
  
@@ -156,7 +148,7 @@ function useSync() {
     reloadList()
   }, [])
 
-  return { list, reloadList, name, setName, key, setKey, text, setText, cypherText, setCypherText, onGet, onPut, onDel }
+  return { list, reloadList, name, setName, key, setKey, text, setText, onGet, onPut, onDel }
 }
 
 async function deriveKey(password: string) {
@@ -177,9 +169,9 @@ async function deriveKey(password: string) {
         "hash": "SHA-256"
     },
     baseKey,
-    {"name": "AES-CBC", "length": 128}, // Key we want
-    true,                               // Extrable
-    ["encrypt", "decrypt"]              // For new key
+    {"name": "AES-CBC", "length": 128}, 
+    true,                               
+    ["encrypt", "decrypt"]              
     );
 
   return aesKey;
@@ -187,11 +179,11 @@ async function deriveKey(password: string) {
 }
 
 function toBase64(bytes: Uint8Array) {
-  return Buffer.from(bytes).toString('base64');
+  return window.btoa(String.fromCharCode(...bytes));
 }
 
 function toBytes(base64: string) {
-  return new Uint8Array(Buffer.from(base64, 'base64'));
+  return new Uint8Array(Array.from(window.atob(base64), c => c.charCodeAt(0)));
 }
 
 async function encrypt(message: string, password: string) {
@@ -217,18 +209,22 @@ async function encrypt(message: string, password: string) {
 }
 
 async function decrypt(encryptedBytes: Uint8Array, iv: Uint8Array, password: string) {
-  const key = await deriveKey(password);
-  const decrypted = new Uint8Array(await window.crypto.subtle.decrypt(
-    {
-      name: "AES-CBC",
-      iv,
-      length: 64,
-    },
-    key,
-    encryptedBytes,
-  ));
+  try {
+    const key = await deriveKey(password);
+    const decrypted = new Uint8Array(await window.crypto.subtle.decrypt(
+      {
+        name: "AES-CBC",
+        iv,
+        length: 64,
+      },
+      key,
+      encryptedBytes,
+    ));
 
   return new TextDecoder().decode(decrypted);
+  } catch (e) {
+    return "failed to decrypt"
+  }
 }
 
 export default App
