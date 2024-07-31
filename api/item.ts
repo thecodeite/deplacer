@@ -20,9 +20,9 @@ export async function GET(request: VercelRequest, response: VercelResponse) {
 }
 
 export async function PUT(request: VercelRequest, response: VercelResponse) {
-  console.log('request:', request)
+  console.log('request:', request.query)
   const {id} = request.query
-  const body = await request.body;
+  const body = request.body;
   await kv.set(`deplacer-item:${id}`, body);
   return response.send('ok');
 }

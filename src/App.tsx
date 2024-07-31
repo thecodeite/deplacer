@@ -105,6 +105,8 @@ function useSync() {
     })
     if (!r.ok) {
       alert('Error putting');
+    } else {
+      reloadList();
     }
   }
 
