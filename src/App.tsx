@@ -65,6 +65,7 @@ function App() {
         <Button onClick={() => onDel() } >del</Button>
         <input type="text" placeholder="deplacer key" value={name} onChange={e => setName(e.target.value)} />
         <input type="password" placeholder="deplacer key" value={key} onChange={e => setKey(e.target.value)}
+        data-1p-ignore
         />
       </HeaderBar>
       {/* <EditorArea> */}
