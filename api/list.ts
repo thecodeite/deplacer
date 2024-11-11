@@ -14,10 +14,10 @@ export async function GET(request: VercelRequest, response: VercelResponse) {
   let cursor = '0'
   let count = 0;
   do {
-    const [newCursor, newItems] = await kv.scan('0', {match: 'deplacer-item:*'});
+    const [newCursor, newItems] = await kv.scan(cursor, {match: 'deplacer-item:*'});
     cursor = newCursor;
     items = items.concat(newItems);
-    if (count++ > 1000) throw new Error('too many items');
+    if (count++ > 10) throw new Error('too many items');
   }  while(cursor !== '0');
 
   items = items.map(str => str.substring('deplacer-item:'.length));
