@@ -86,12 +86,14 @@ function useSync() {
   const payloadRef = useRef('');
   const textDebounceRef = useRef(0);
 
+  const effectiveKey = key || name;
+
   async function onGet() {
     const r = await fetch(`/api/item?id=${name}`)
     if (r.ok) {
       const data = await r.json()
       console.log('data:', data.encryptedText)
-      const decrypted = await decrypt(toBytes(data.encryptedText), toBytes(data.ivBase64), key);
+      const decrypted = await decrypt(toBytes(data.encryptedText), toBytes(data.ivBase64), effectiveKey);
       setTextSetter(decrypted)
     }
     if (!r.ok) {
@@ -135,7 +137,7 @@ function useSync() {
     setTextSetter(text);
     clearTimeout(textDebounceRef.current);
     textDebounceRef.current = window.setTimeout(async () => {
-      const {encryptedBytes, iv} = await encrypt(text, key);
+      const {encryptedBytes, iv} = await encrypt(text, effectiveKey);
       
       const ivBase64 = toBase64(iv);
       const encryptedText = toBase64(encryptedBytes);
