@@ -81,7 +81,7 @@ function App() {
 function useSync() {
   const [list, setList] = useState<string[]>([])
   const [name, setName] = useState('')
-  const [key, setKey] = useState('')
+  const [key, setKeySetter] = useState('')
   const [text, setTextSetter] = useState('')
   const payloadRef = useRef('');
   const textDebounceRef = useRef(0);
@@ -132,9 +132,17 @@ function useSync() {
     }
   }
 
+  const setKey = (newKey: string) => {
+    setKeySetter(newKey);
+    doEncrypt();
+  }
 
-  const setText = (text: string) => {
-    setTextSetter(text);
+  const setText = (newText: string) => {
+    setTextSetter(newText);
+    doEncrypt();
+  }
+
+  const doEncrypt = async () => {
     clearTimeout(textDebounceRef.current);
     textDebounceRef.current = window.setTimeout(async () => {
       const {encryptedBytes, iv} = await encrypt(text, effectiveKey);
