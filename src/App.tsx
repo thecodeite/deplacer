@@ -81,10 +81,8 @@ function App() {
 function useSync() {
   const [list, setList] = useState<string[]>([])
   const [name, setName] = useState('')
-  const [key, setKeySetter] = useState('')
-  const [text, setTextSetter] = useState('')
-  const payloadRef = useRef('');
-  const textDebounceRef = useRef(0);
+  const [key, setKey] = useState('')
+  const [text, setText] = useState('')
 
   const effectiveKey = key || name;
 
@@ -94,7 +92,7 @@ function useSync() {
       const data = await r.json()
       console.log('data:', data.encryptedText)
       const decrypted = await decrypt(toBytes(data.encryptedText), toBytes(data.ivBase64), effectiveKey);
-      setTextSetter(decrypted)
+      setText(decrypted)
     }
     if (!r.ok) {
       alert('Error getting');
@@ -102,9 +100,10 @@ function useSync() {
   }
 
   async function onPut() {
+    const payload = await doEncrypt();
     const r = await fetch(`/api/item?id=${name}`, {
       method: 'PUT',
-      body: payloadRef.current,
+      body: payload,
     })
     if (!r.ok) {
       alert('Error putting');
@@ -119,8 +118,9 @@ function useSync() {
     })
     if (r.ok) {
       reloadList();
-      setTextSetter('');
+      setText('');
       setName('');
+      setKey('');
     }
   }
 
@@ -132,28 +132,14 @@ function useSync() {
     }
   }
 
-  const setKey = (newKey: string) => {
-    setKeySetter(newKey);
-    doEncrypt();
-  }
-
-  const setText = (newText: string) => {
-    setTextSetter(newText);
-    doEncrypt();
-  }
-
   const doEncrypt = async () => {
-    clearTimeout(textDebounceRef.current);
-    textDebounceRef.current = window.setTimeout(async () => {
-      const {encryptedBytes, iv} = await encrypt(text, effectiveKey);
-      
-      const ivBase64 = toBase64(iv);
-      const encryptedText = toBase64(encryptedBytes);
+    const {encryptedBytes, iv} = await encrypt(text, effectiveKey);
+    
+    const ivBase64 = toBase64(iv);
+    const encryptedText = toBase64(encryptedBytes);
 
-      const message = { ivBase64, encryptedText }
-      payloadRef.current = JSON.stringify(message);
- 
-    }, 1000);
+    const message = { ivBase64, encryptedText }
+    return  JSON.stringify(message);
   }
 
 
