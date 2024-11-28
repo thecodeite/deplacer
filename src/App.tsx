@@ -55,7 +55,7 @@ function App() {
   return (
     <AppWrapper>
       <HeaderBar>
-        <HeadText>Deplacer</HeadText>
+        <HeadText>Deplacer v1.0</HeadText>
         <IconButton onClick={() => reloadList()}><IoMdRefreshCircle /></IconButton>
         {list.map((name, i) => <Button key={i} onClick={() => setName(name)}>{name}</Button>)}
       </HeaderBar>
